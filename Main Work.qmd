@@ -1,0 +1,738 @@
+---
+title: "💬 DS202W - Summer Summative"
+author: "22840"
+output: html
+self-contained: true
+editor:
+    render-on-save: true
+    preview: true
+---
+# 📖 Introduction
+This is the exam assignment of the DS202W course. The whole report follows the instructions in the README file. However, here are some notes about this report that I would like to mention before you start reading it:
+
+-   The whole report takes 10 minutes to run in total.
+
+-   I have folded all the code chunks, so you can review them. Some code chunks did not display output because they take a very long time to run. Better not to execute them.
+
+-   Some outputs take a long time to run but are very important, so I have pasted them in image form below the corresponding code chunks. You can view these images there.
+
+-   I used ChatGPT3.5 three times during the project, and I mentioned them in detail about how I used them and for what purposes at the end of the report.
+
+# 👾 Part 1: About Supervised Learning
+Before answering the questions, it's important to first have a glimpse of the dataset that we are working on:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(tidymodels)
+library(rsample)
+library(quanteda)
+library(quanteda.textplots)
+library(quanteda.textstats)
+
+#new librsries for decision trees
+library(rpart)
+library(rpart.plot)
+library(parttree)
+
+#for random forest
+library(ranger)
+
+#new library for k-means clustering mainly
+library(tidyclust)
+library(tidyquant)
+
+#libraries to explore missing data patterns
+library(naniar)
+library(UpSetR)
+
+library(factoextra) # library that contains the data set and allows us to visualise the clusters
+library("fpc") # library that allows to use dbscan
+library(dbscan)
+```
+
+```{r warning=FALSE, message=FALSE}
+#| code-fold: TRUE
+
+#load the data
+diabetes_data <- read_csv("cdc_diabetes.csv")
+
+knitr::kable(head(diabetes_data))
+```
+
+
+## 😃 Question 1
+
+There are three sub-questions within this question which are:
+
+-   What do you see?
+-   What choices do you think lay behind the data scientist's modeling?
+-   Do you think this is a good model? And if not, why not?
+
+
+> **What do you see?**
+
+
+I can make observations from three main aspects: the dataset, the code, and the decision tree plot. Firstly, regarding the dataset, there are 21 health-related attributes, including features like `HighBP`, `BMI`, `GenHlth`, and `PhysActivity`, with the target variable `Diabetes_012` classifying individuals as healthy (0), pre-diabetic (1), or diabetic (2). Many features are binary or categorical, represented as factors in R, and some features are numeric, such as `Age` and `Income`.
+
+From the codes, the data scientist first converted character variables to factors. However, the person didn't convert the other categorical variables to factors. We can also conclude this from the tree plot that the first split indication `HighBP<0.5` shows that `HighBP` is numeric while it's actually a binary feature.
+
+Also, we can see that a decision tree model was built using the `rpart` engine in R. Importantly, the tree was created with *cost_complexity = 0*, meaning no tuning was applied to simplify the tree. What's more, the data was split into training (70%) and testing (30%) sets.
+
+Finally, the decision tree plot shows the tree structure and depth, with nodes representing splits based on feature values and leaves representing the predicted class. The tree is quite deep, with numerous branches and nodes, indicating a very complex model. Key features involved in splits include `HighBP`, `BMI` and `GenHlth`. However, the complex splits suggest that the model has tried to fit the training data very closely. It indicates that the model is sensitive to various aspects of the data, but it also highlights the risk of the model being overfitting. This is because this model too complex that it may capture noise and small fluctuations in the training data rather than the underlying patterns.
+
+> **What choices do you think lay behind the data scientist's modeling?**
+
+There are three main decisions made in this project. I would like to use a table to summarise the choices made by the data scientist in modeling and the potential reasons behind them:
+
+| Choices | Comments | Potential Drawbacks |
+|---------|---------|---------------------|
+| Using a decision tree model | Decision trees are easy to interpret and visualise, making them suitable for understanding the model's decision-making process and the data patterns. What's more, it can handle both numeric and categorical variables suitable for this dataset. Moreover, the targeted variable is a three-class variable which can not be analysed by Logistic Regression, hence decision tree seems to be more reasonable. | However, it can be prone to overfitting, especially when they are deep and complex as this case. |
+|Split data into training (70%) and testing (30%) sets | This is a common and easy data resampling strategy to train the model and evaluate the model's performance on testing data. | However, the split ratio is fixed, making it less robust. Other techniques like cross-validation could be used for more robust evaluation. |
+| Chose `cost_complexity` as the tuning parameter | For a decision tree model, a tuning parameter must be specified. The `cost_complexity` parameter controls the tree complexity. A value of 0 indicates no pruning, leading to a complex tree. | High complexity can lead to overfitting, other parameters like `min_n` or `tree_depth` could be better options or an adjustment on the `cost_complexity` is required. |
+| No tuning as indicated by `cost_complexity = 0` | It can lead to a complex tree with many splits, capturing detailed patterns in the training data. | However, this can also lead to overfitting, as the model tries to capture noise and fluctuations in the training data. Pruning could simplify the tree and improve generalisation to testing data. |
+
+> **Do you think this is a good model? And if not, why not?**
+
+It's difficult to say whether this is a good model or not without further evaluation. There is no indication that the model's performance on the test set was evaluated. Without such evaluation, it is impossible to determine the model's accuracy, precision, recall, AUC, or other relevant metrics. However, based on the given observations, there are some concerns that need to be addressed:
+
+-   The categorical variables are not converted to factors, which could lead to incorrect interpretations of the data and model. This could be the most important issue that needs to be fixed first.
+
+-   The decision tree is very complex, with many splits and branches. This complexity suggests that the model has captured a lot of details from the training data, including noise and minor fluctuations, which is a classic sign of overfitting.
+
+-  The decision tree plot is overly detailed and difficult to interpret due to the large number of splits. While decision trees are generally valued for their interpretability, the high complexity loses that advantage.
+
+-   The model was built without any tuning, which could lead to suboptimal performance. Tuning hyperparameters, including the tree depth or minimum samples per leaf, could improve the model's generalisation to testing data. To do so, we could plot the values for the `roc_auc` metric for each value of parameter to find the optimal tuning value.
+
+-   Due to its high complexity and lack of tuning, the model is likely to perform well on the training data but poorly on testing data. This reduces the model's usefulness in real-world applications as the model's aim to predict unseen data in the real world.
+
+
+
+## 😃 Question 2
+
+> **Q2: What would you do differently from what the data scientist chose to do? How would you evaluate your model? Why?**
+
+First, I would attempt a similar data processing as the data scientist, while converting the categorical variables to factors. I can also do it at the recipe creation stage, but I prefer doing so at the data processing stage as I can check the resulted classes of each column after the conversion. The check table is shown below:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+numeric_vars <- c("Age", "BMI", "MentHlth", "PhysHlth", "Education", "Income")
+categorical_vars <- setdiff(names(diabetes_data), numeric_vars)
+
+# Convert character variables to factors
+diabetes_data[categorical_vars] <- lapply(diabetes_data[categorical_vars], as.factor)
+
+# Check the class of each column
+knitr::kable(sapply(diabetes_data, class), col.names = "Column Type")
+```
+
+However, there is a tricky part that `GenHlth` has 5 levels, and it's not clear whether it's ordinal or nominal. If it's ordinal, we should convert it to a numeric variable. If it's nominal, we should convert it to a dummy variable. Here, I assume it's a categorical variable and convert it to a factor, but further check on the data dictionary is needed.
+
+Next, I would split the data into training and testing sets by 3:7 same as the previous data scientist for model building. A more robust cross-validation strategy would be used to evaluate the model's performance later at model evaluation stage. The following table shows the class distribution in the training and testing sets:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+set.seed(123)
+# Split the data into training (70%) and testing (30%) sets
+data_split <- initial_split(diabetes_data, prop = 0.7, strata = "Diabetes_012")
+training_data <- training(data_split)
+testing_data <- testing(data_split)
+
+# Check the class distribution in the training and testing sets
+knitr::kable(cbind(prop.table(table(training_data$Diabetes_012)), prop.table(table(testing_data$Diabetes_012))),
+             col.names = c("Training Set", "Testing Set"))
+```
+
+From the table, we can see that the class distribution is similar in both the training and testing sets, which is good for model creation. Also, the class distribution is highly imbalanced, with more 0 than others. It shows that accuracy may not be a good indicator of model performance.
+
+For model specification, I would also use the *decision tree* model given the reasons mentioned in the first question. However, I would tune the hyperparameters to simplify the tree and reduce overfitting. To find the best parameter, I would use cross-validation to test the ROC-AUC value for each parameter in the folds. The following table shows the ROC-AUC values for different values of `cost_complexity`:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Create a recipe
+tree_rec <-
+  recipe(Diabetes_012 ~ .,
+         data = training_data) %>%
+  prep()
+
+# Create the specification of a model
+dt_spec <- 
+    decision_tree(mode = "classification", 
+    cost_complexity = tune()) %>% 
+    set_engine("rpart")
+
+wflow <- 
+  workflow() %>% 
+  add_recipe(tree_rec) %>% 
+  add_model(dt_spec)
+
+set.seed(234)
+folds <- vfold_cv(training_data, v = 5)
+
+ctrl <- control_grid(verbose = FALSE, save_pred = TRUE)
+
+grid_search <- expand_grid(
+  cost_complexity = c(0:10)
+)
+
+
+dt_res <- tune_grid(
+  wflow,
+  # This computes k-fold CV during tuning
+  resamples = folds,
+  grid = grid_search,
+  control = control_grid(verbose = FALSE, save_pred = TRUE)
+)
+
+knitr::kable(show_best(dt_res, metric = "roc_auc"))
+```
+This result is somewhat unexpected🥹. When the cost_complexity is 0, the ROC_AUC value is the highest at 0.66. This indicates that the model does not suffer from overfitting, but the value is still relatively low, and the issue of high complexity remains unresolved. This could be due to the poor choice of model. To reduce sunk costs, I am planning to switch to a new model immediately - *Random Forest*. Given the high complexity of the decision tree, Random Forest reduces overfitting improves generalisation by averaging multiple decision trees. Also, it's more robust than a single decision tree.
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Define a Random Forest model specification
+rf_spec <- rand_forest(
+  mtry =  sqrt(ncol(training_data) - 1), # as indicated in the documentation
+  min_n = 5,
+  trees = 500,
+  mode = "classification"
+) %>%
+  set_engine("ranger")
+
+# Define the recipe
+rf_rec <- recipe(Diabetes_012 ~ ., data = training_data)
+
+# Define the workflow
+rf_workflow <- workflow() %>%
+  add_recipe(rf_rec) %>%
+  add_model(rf_spec)
+
+# Fit the final model on the entire training data
+final_rf_model <- rf_workflow %>%
+  fit(data = training_data)
+```
+
+Now, let's fit the model with evaluate the model. Here, I would use the metric table to evaluate the model on the test data:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+# Evaluate the model on the test data
+rf_test_results <- final_rf_model %>%
+  predict(new_data = testing_data) %>%
+  bind_cols(testing_data) %>%
+  metrics(truth = Diabetes_012, estimate = .pred_class)
+
+# Print test results
+knitr::kable(rf_test_results)
+```
+From the table, we see that the model has a high accuracy of about 84.87%, indicating it performs well overall in predicting the classes. However, as I mentioned above, given that the class distribution is imbalanced, accuracy may not be the best metric to evaluate the model. At the same time, the low Kappa value of 0.1956 indicates that the model's predictions are only slightly better than random chance in terms of agreement with the true labels. Overall, from this metric table, we can conclude that the random forest model does **NOT** have a good performance.
+
+Other metrics like ROC can be a good metric for imbalanced classification problems like this one, as it shows the trade-off between true positive rate and false positive rate. Also, it can produce a visual explanation as the area under the ROC curve (AUC) is a good summary metric for the model's performance. However, ROC is by default a binary classification metric, so further manipulation is needed to apply it to this three-class classification.
+
+Finnally, I would use `Cross-Validation` to further improve the resampling and again produce the metric table.
+
+
+### 🧐 Comments
+
+The challenge of this project is the fact that the target variable is not binary but a three-class variable. This means we cannot use Logistic Regression and instead have to use a Decision Tree. However, Decision Trees are prone to overfitting, so we need to use Random Forest to address this issue. The downside of Random Forest is that it has many trees, which requires more time and computing effort. Nonetheless, my final results showed that Random Forest did not perform well. There are two possible reasons for this:
+
+1.    I did not tune the parameters properly. I used the default parameters, and further tuning might lead to better performance.
+
+2.    It could be due to the nature of the data itself. The data distribution is imbalanced, and classification might not be suitable for this dataset. Other engine methods might produce better results.
+
+
+
+## 😃 Question 3
+
+>**Q3: How would you approach such a situation? And would you still manage to make predictions about the health status of a person (i.e healthy, pre-diabetic or diabetic)?**
+
+Let's first see the example poisoned data to have some understanding:
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Load necessary libraries
+library(tidymodels)
+library(tidyverse)
+
+# Load the CDC Diabetes Health Indicators dataset
+# Replace this with the actual path to your dataset
+diabetes_data <- read_csv("cdc_diabetes.csv")
+
+# Function to poison a percentage of labels in the target column
+poison_labels <- function(data, target_column, poison_percentage) {
+  set.seed(42)
+  n <- nrow(data)
+  num_to_poison <- round(n * poison_percentage / 100)
+  
+  # Ensure the target column is a factor
+  data[[target_column]] <- as.factor(data[[target_column]])
+  
+  # Randomly select indices to poison
+  poison_indices <- sample(seq_len(n), size = num_to_poison, replace = FALSE)
+  
+  # Possible class labels
+  possible_labels <- levels(data[[target_column]])
+  
+  # Poison the selected labels
+  for (i in poison_indices) {
+    current_label <- data[[target_column]][i]
+    new_label <- sample(possible_labels[possible_labels != current_label], 1)
+    data[[target_column]][i] <- new_label
+  }
+  
+  return(data)
+}
+
+# Poison 10% of the Diabetes_012 labels in the dataset
+# Change the last parameter to change the proportion of labels poisoned
+poisoned_data <- poison_labels(diabetes_data, "Diabetes_012", 10)
+
+# Inspect the first few rows of the poisoned data
+head(poisoned_data)
+```
+
+First, as Ghita mentioned, **"you don't know what the correct data looks like, and you don't know the exact proportion of observations that are poisoned (it could be 1% or 90%!)"**. Although I find it unlikely that poisoned data would account for as much as 90%, if such a situation does occur, the dataset would lose its research value. This could happen if clustering reveals no patterns or if no classification model performs well.
+
+Ignoring this extreme scenario, I would use `unsupervised learning` to *identify similarities and patterns* in the dataset and *detect outliers*. Aimly, I would perform clustering to find data patterns, using methods like DBSCAN or K-means. Before that, I would employ anomaly detection techniques, such as Local Outlier Factor (LOF), to identify and remove the poisoned data, which are the outliers. This approach is based on the assumption that the poisoned data differ significantly from the other data and can be categorised as outliers. However, if the poisoned data are only slightly altered and not significantly different, this method would fail to identify them.
+
+Here, I would use LOF as the anomaly detection method to identify the poisoned data. It's a good technique to identify poinsoned data as it calculates the local density deviation of a data point with respect to its neighbours. Here are the steps I would take before doing LOF:
+
+1.  Convert all variables to numeric, as LOF requires numeric data.
+
+2.  Remove missing values, as LOF cannot handle missing data.
+
+3.  Normalise the data, as LOF is sensitive to the scale of the data.
+
+4.  Add a new column for ID identification of each patient.
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# add a new column for ID
+poisoned_data$patient_ID <- seq_len(nrow(poisoned_data))
+
+lof_recipe <-
+ # we don't have an outcome variable here
+  recipe(~., data = poisoned_data) %>%
+  # update the role of the new column
+  update_role(patient_ID, new_role = "ID") %>%
+  # convert all variables to numeric
+  step_mutate(Diabetes_012 = as.numeric(as.factor(Diabetes_012))) %>%
+  # remove missing values
+  step_naomit(all_predictors()) %>%
+  # normalize the data to avoid out-sized impact of some variables
+  step_normalize(all_numeric_predictors()) %>%
+  prep()
+
+# apply the recipe to our data set
+lof_df <- bake(lof_recipe, poisoned_data)
+```
+
+When applying LOF, I need to first set the value for `minPts`. There is a general rule for this mentioned in the lecture:
+
+> *The value of `minPts` should be at least one greater than the number of dimensions of the dataset, i.e., **`minPts>=Dimensions+1`**. It does not make sense to take `minPts` as 1 because the result will be each point being a separate cluster.*
+
+Following this rule, I'll set `minPts` as 23, as there are 22 dimensions in my model, including `Diabetes_012`.
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+set.seed(040116)
+
+# Apply LOF to the data
+lof_res <- lof(lof_df%>%select(-patient_ID), minPts = 23)
+```
+
+Now, we need to find the LOF indicator that can identify the outliers in the dataset. The points with a LOF score greater than the LOF indicator are considered outliers. The LOF indicator is the elbow point on a LOF distribution plot.
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+plot(sort(lof_res), type = "l",  main = "LOF (minPts = 23)",
+  xlab = "Points sorted by LOF", ylab = "LOF")
+abline(h=1.6,lty=2)
+```
+
+Based on the above plot, the LOF indicator is set around at 1.6. Points with a LOF score greater than 1.6 are considered outliers. After detection, there are 4202 points identified as the outliers. The following table shows the top 6 outliers with LOF greater than 1.6:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Show the top LOF scores
+anomaly_data <- lof_df %>% 
+  add_column(lof_score = lof_res) %>%
+  select(lof_score, everything())
+
+outliers <- anomaly_data %>%
+  filter(lof_score > 1.6) %>%
+  select(patient_ID, lof_score) %>%
+  arrange(desc(lof_score))
+
+poisoned_data %>%
+  filter(patient_ID %in% outliers$patient_ID) %>%
+  # add a new column to show the LOF score
+  left_join(outliers, by = "patient_ID", ) %>%
+  arrange(desc(lof_score)) %>%
+  select(lof_score, patient_ID, everything()) %>%
+  head(6) %>%
+  knitr::kable()
+```
+
+The issue of LOF scores showing as `Inf` (infinity) typically indicates a problem with the calculation, such as extremely high or low density values. This can happen due to several reasons, such as the presence of identical rows, extreme outliers, or numerical instability in the dataset. Further manipulations like adjusting `minPts` or handling extreme values may be needed to address this issue.
+
+Next, I would then remove all the outliers from the dataset, as they are likely to be the poisoned data. After removing the outliers, I would proceed with DBSCAN clustering to identify patterns in the data.
+
+# 🩻 Part 2: Exploring diabetic/prediabetic patients characteristics
+
+>**Suppose we have a few candidate drugs/treatments we want to trial. We first want to understand whether there are particular patterns/characteristics in our patient groups that might induce similar responses to the drugs/treatments. How would you approach this task?**
+
+Firstly, the ultimate research purpose is to use a group of similar patient groups for a drug trial to ensure that no other factors affect the drug's outcome. Therefore, we need to study the patterns within the data to identify similar patient groups. Unsupervised learning, particularly clustering, is applied here again. Clustering helps distinguish different patient groups by finding similar patterns, and we can use one particular cluster for the drug trial to ensure no confounders affect the final experiment.
+
+I will use the unpoisoned dataset to reduce the impact of outliers. For greater rigor, you can perform a outlier detection on the original dataset first to ensure data accuracy, but I may not do so here due to time-constraint. Before clustering, I will apply `PCA` to reduce the data's dimensionality, which will help visualise the data better and identify the patterns to decide which clustering method to use. 
+
+Similar to LOF, here are some steps I would take for PCA recipe:
+
+1.  Add a new column for ID identification of each patient.
+
+2.  Convert all variables to numeric, as PCA can only process numeric data.
+
+3.  Remove missing values, as PCA cannot handle missing data.
+
+4.  Normalise the data, as PCA is sensitive to the scale of the data.
+
+I would use two PC variables as it's convenient for visualisation. The following table shows the head of the resulted PCA results:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+diabetes_data <- read_csv("cdc_diabetes.csv")
+# add a new column for ID
+diabetes_data$patient_ID <- seq_len(nrow(diabetes_data))
+
+pca_recipe <-
+ # we don't have an outcome variable here
+  recipe(~., data = diabetes_data) %>%
+  update_role(patient_ID, new_role = "ID") %>%
+  # remove missing values
+  step_naomit(all_predictors()) %>%
+  # normalize the data to avoid out-sized impact of some variables
+  step_normalize(all_numeric_predictors()) %>%
+  # apply principal component analysis
+  step_pca(all_predictors(), num_comp = 2, keep_original_cols=TRUE) %>%
+  prep()
+
+# apply the recipe to our data set
+pca_results <- bake(pca_recipe, diabetes_data)
+pca_results <- pca_results %>%
+  select(patient_ID, PC1, PC2)
+
+knitr::kable(head(pca_results))
+```
+
+It's important to note that PCA is a linear transformation method, and it assumes correlations and linear relationships between features. Also, it's sensitive to outliers, so it's recommended to remove outliers before applying PCA. To make it more visual, I will plot the PCA results in a scatter plot. The plot shows the distribution of two PC variables and we can decide which clustering method to use from the plot pattern.
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+ggplot(pca_results, aes(PC1, PC2)) +
+  geom_point(alpha=0.3,color="#7038d1") +
+  ggtitle("Principal Components", subtitle = "2-dimensional representation of 22 predictors")
+```
+The plot shows a dense central cluster with points spreading outwards, indicating that most data points are concentrated in the center. There are some points that are more spread out towards the edges, which could be potential outliers or less common patterns in the data. Given the dense central cluster in the plot, `DBSCAN` is a good clustering strategy can effectively identify this high-density region as a cluster. Also, it naturally identifies outliers as points that do not belong to any cluster.
+
+According to the `minPts` rule mentioned above, I'll set the parameter as 4, as there are two dimensions in my model. For `eps`, I'll use the `k-NN distance` plot to determine the optimal value. The optimal `eps` value is where the plot shows an elbow point, indicating a significant change in the distance. The plot is shown as follows:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+dbscan::kNNdistplot(pca_results%>%select(PC1, PC2), k = 4)+
+  abline(h = 0.12, lty = 2) +
+  scale_y_continuous(n.breaks = 40) 
+```
+From my observation, the elbow point is around 0.12, thus I'll set `eps` as 0.12.
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+# Better not run this code chunk as it may respond forever
+
+#set.seed(123)
+#db <- fpc::dbscan(pca_results%>%select(PC1, PC2), eps = 0.12, MinPts = 4)
+
+# Plot DBSCAN results
+# plot(db, pca_results, main = "DBSCAN results", frame = FALSE)
+#fviz_cluster(db, data = pca_results%>%select(PC1, PC2), stand = FALSE,
+#             ellipse = FALSE, show.clust.cent = FALSE,
+#             geom = "point", ggtheme = theme_bw(base_size=15))
+```
+Due to the large size of this dataset, even after reducing the data with PCA, DBSCAN still requires a significant amount of time to respond. This is one of its drawbacks. Here are some ways to improve its speed:
+
+-   Increase the `eps` paramter. A higher eps value reduces the number of distance calculations, speeding up the algorithm. However, it may also result in fewer, larger clusters.
+
+-   Use a smaller subset of the data for initial clustering. However, it reduces the accuracy of the clustering.
+
+Therefore, in this summative, I would create a subset by randomly selecting 2000 subjects from the dataset and apply DBSCAN to the reduced dataset for the sake of time. The resulted DBSCAN clusters are shown as follows:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Randomly select 2000 subjects
+set.seed(123)
+sampled_data <- pca_results[sample(nrow(diabetes_data), 2000),]
+
+db <- fpc::dbscan(sampled_data%>%select(PC1, PC2), eps = 0.12, MinPts = 4)
+
+# Plot DBSCAN results
+# plot(db, pca_results, main = "DBSCAN results", frame = FALSE)
+fviz_cluster(db, data = sampled_data%>%select(PC1, PC2), stand = FALSE,
+             ellipse = FALSE, show.clust.cent = FALSE,
+             geom = "point", ggtheme = theme_bw(base_size=15))
+
+```
+The DBSCAN plot indicates that the algorithm successfully identified multiple clusters and outliers in the data. The dense central region with several sub-clusters suggests areas with high data density. However, the presence of many outliers indicates the sensitivity of DBSCAN to the `eps` parameter, which might need further tuning for optimal results. Overall, DBSCAN provides a useful clustering pattern.
+
+If the goal is to select subjects for a drug experiment, a subset of 2000 observations is sufficient. In drug experiments, a smaller number of subjects helps ensure lower financial costs. Additionally, by ensuring randomness in the selection of this subset, we can ensure that it represents the entire population.
+
+By clustering the data using DBSCAN, we can then randomly select a cluster or randomly select one subject from each cluster for the drug trial in subsequent experiments. The method of selecting subjects depends on the final research question. Generally, patients within the same cluster will have similar health characteristics, leading to similar responses to the drug.
+
+
+# ⭐ Part 3: Pharmaceutical reviews
+
+>**Q4: Propose one compelling research question that one could investigate with this dataset. How would you start answering that question? The choice of methods to use in this research is entirely yours: your only constraint is that the reviews data has to be used in some shape or form in your research (and of course, the topics of the original publication paper that introduced this dataset are off limits 😉).**
+
+Data loading:
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Load the dataset
+reviews_train <- read_tsv("drug_review_dataset/drugsComTrain_raw.tsv")
+reviews_test <- read_tsv("drug_review_dataset/drugsComTest_raw.tsv")
+```
+
+By viewing the two datasets, I noticed a column that caught my attention: `review` which contains each patient's experiences and thoughts on different medications. I want to start with this text information to **find pairs of patients with highly similar reviews**, and then compare their medication names, conditions, and other differing information, to study how other factors influence the reviews. For instance, do two patients with very similar reviews have the same review because they used the same medication at the same time under the same condition? This kind of study can help us better understand patients' feedback on medications, thereby improving the effectiveness of medication usage. Therefore, my research question is:
+
+> **Calculate the the similarity between the reviews we have in our dataset and what differs their similarities?**
+
+To answer this question, I need to combine the training and testing datasets, as I'm not going to do a prediction model but rather a explanatory analysis. 
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Combine the training and testing datasets
+reviews_data <- bind_rows(reviews_train, reviews_test)
+
+# Arrange it with ascending order of the `...1` column
+reviews_data <- reviews_data[order(reviews_data$...1),]
+
+# Rename the `...1` column to `review_id`
+colnames(reviews_data)[1] <- "review_id"
+
+head(reviews_data)
+```
+I'll then do a tokenisation by spliting the text into individual words or tokens. The following plot shows how many tokens are there in the reviews:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+corp_reviews <- quanteda::corpus(reviews_data, text_field="review")
+quanteda::docnames(corp_reviews) <- reviews_data$`review_id`
+
+reviews_df <- summary(corp_reviews)
+
+max_x_break <- round(max(reviews_df$Tokens), -1)
+
+g <- (
+  ggplot(reviews_df, aes(x=Tokens))
+  + geom_histogram(binwidth=10, fill="#C63C4A")
+  + theme_minimal()
+  
+  + scale_x_continuous(breaks = seq(0, max_x_break, by = 20))
+  
+  + labs(x="Number of Tokens",
+         y="Count",
+         title="How many tokens are there in those texts?",
+         subtitle = "Corpus: patient reviews on different drug treatment")
+  
+  + # Prettify plot a bit
+  theme_bw() +
+  theme(plot.title=element_text(size=rel(1.5)),
+        plot.subtitle = element_text(size=rel(1)),
+        axis.title=element_text(size=rel(1.3)),
+        axis.title.x=element_text(margin=margin(t=10)),
+        axis.title.y=element_text(margin=margin(r=10)),
+        axis.text=element_text(size=rel(1.2)))
+)
+
+g
+```
+The majority of the data points (token counts) are concentrated between 0 and 200 tokens. There is a significant gap between the main distribution and a small number of outliers (token counts between 240 and 360), indicating the presence of these outliers that are far away from the majority of the data points.
+
+Next, I plan to remove punctuation since it doesn't carry much meaning in text analysis. However, for stop words, I will compare the word clouds with and without them to determine if their removal is necessary. The rationale is that if the most frequent words in the word cloud are stop words, it would be better to remove them as they can introduce noise into the analysis.
+
+The following plot shows the word cloud with stop words:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Get rid of punctuation or stopwords
+
+tokens_reviews <- 
+  # Get rid of punctuations
+  quanteda::tokens(corp_reviews, remove_punct = TRUE) 
+
+tokens_reviews <- tokens_ngrams(tokens_reviews, n=1:2)
+
+dfm_reviews <- quanteda::dfm(tokens_reviews)
+
+quanteda.textplots::textplot_wordcloud(dfm_reviews)
+```
+As expected, the word cloud reveals that the most frequent words are stop words like "the" "and" "i" etc. These words do not contribute meaningful insights in text analysis, so I will remove them in the next step. What's more, there is a special character `#039` which is quite frequent, and I would also remove tokens that include this meaningless character. 
+
+However, we must be cautious, as removing stop words may also eliminate some important information, such as "not" or "no". Additionally, since I will remove all tokens containing the special character `#039`, some meaningful tokens, such as `#039_have`, `love_#039_`, will also be deleted.
+
+The following plot shows the word cloud without stop words. This code chunk takes ages to run, you can click the link below to see the pasted graph as the final output:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+tokens_reviews_no_stopwords <-  tokens_reviews %>%
+  # Get rid of stopwords
+  quanteda::tokens_remove(pattern = quanteda::stopwords("en")) %>%
+  # Get rid of tokens with '#039' inside
+  quanteda::tokens_remove(pattern = ".*#039.*", valuetype = "regex")
+
+tokens_reviews_no_stopwords <- tokens_ngrams(tokens_reviews_no_stopwords, n=1:2)
+dfm_reviews_no_stopwords <- quanteda::dfm(tokens_reviews_no_stopwords)
+
+quanteda.textplots::textplot_wordcloud(dfm_reviews_no_stopwords)
+```
+[wordcloud without stopwords](Graph/wordcloud_2.png)
+
+
+From this word cloud, we can see some similarities between reviews: *people's reviews mainly focus on the side effects of the medication, daily usage, pain, purpose, and other related aspects.* These words are very meaningful and can help us understand the angles from which patients review the medication and which dimensions they value the most.
+
+Next, for calculating the similarity, I will first convert text data into vectors. Here I will use **TF-IDF technique**, which returns *a document-feature matrix* that will be passed on to more robust similarity calculations. The resulted matrix would look like the following:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+ifidf <- dfm_tfidf(dfm_reviews_no_stopwords, scheme_tf = "prop")
+ifidf
+```
+
+Then, I will calculate the similarity between the reviews using the `cosine similarity` method which is mentioned in the lecture. Cosine similarity measures the cosine of the angle between two vectors, which is a measure of similarity between two non-zero vectors. The closer the cosine similarity is to 1, the more similar the two vectors are. The equation for this method is:
+
+-   Cosine distance: $S_C(A,B)=\frac{\sum_{i=1}^n A_iB_i}{\sqrt{\sum_{i=1}^n A_i^2}\sqrt{\sum_{i=1}^n B_i^2}}$
+
+Due to the large size of the database, my laptop cannot handle such processing. Therefore, I decided to randomly select 2000 tokens from all the tokens for calculation. This approach reduces computation time while ensuring the randomness of the data. And the following table shows the top 6 pairs of reviews with the highest cosine similarity. Again this code chunk may take ages to run, you can click the link below to see the pasted table as the final output:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Randomly select 2000 documents
+set.seed(123)
+sampled_docs <- sample(seq_len(ndoc(dfm_reviews_no_stopwords)), 2000)
+
+# Subset the dfm to include only the sampled documents
+dfm_sampled <- dfm_reviews_no_stopwords[sampled_docs, ]
+tfidf <- dfm_tfidf(dfm_sampled, scheme_tf = "prop")
+
+# Compute cosine similarity
+similarity_matrix <- textstat_simil(tfidf, method = "cosine")
+
+# Convert it into a data frame
+similarity_df <- as.data.frame(as.matrix(similarity_matrix))
+similarity_df <- similarity_df %>% 
+  rownames_to_column(var = "doc1") %>% 
+  pivot_longer(cols = -doc1, names_to = "doc2", values_to = "cosine") %>% 
+  filter(doc1 != doc2) %>% 
+  arrange(desc(cosine))
+
+# Display the top 6 pairs of reviews with the highest cosine similarity
+head(similarity_df, 6)
+```
+
+[cosine table](Graph/cosine_table.png)
+
+Now, let's look at the first pair of reviews and compare their other metadata to see if there are any similarities.
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Get the first pair of reviews
+pair1 <- similarity_df[1, c("doc1", "doc2")]
+
+# Get the metadata for the first pair of reviews
+metadata_pair1 <- reviews_data %>%
+  filter(review_id %in% pair1) %>%
+  select(-review)
+
+knitr::kable(metadata_pair1)
+```
+
+We can see that these two patients also have highly similar metadata, which might explain why their reviews are similar. They both encountered the same condition, **Osteoporosis**, at the same time but used different medications, **Forteo** and **Teriparatide**, respectively. Their reactions to the medications, as reflected in their reviews, ratings, and useful counts, are identical, suggesting that these two medications have the same effect under this condition. This result also indicates that our cosine similarity calculation is effective in identifying patients with similar reviews.
+
+Now, let's examine the second pair of reviews:
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: TRUE
+
+# Get the second pair of reviews
+pair2 <- similarity_df[2, c("doc1", "doc2")]
+
+# Get the metadata for the second pair of reviews
+metadata_pair2 <- reviews_data %>%
+  filter(review_id %in% pair2) %>%
+  select(-review)
+
+knitr::kable(metadata_pair2)
+```
+
+Similarly, this pair of similar reviews also encountered the same condition at the same time but had identical reviews for two different medications. The consistency in reviews across these pairs suggests that the key factor leading to similar patient reviews is not the specific medication used but rather the condition encountered and the timing of the medication usage. This comparison allows us, as data scientists, to better understand how patient reviews are formed and helps doctors identify which medications receive similar feedback for a particular condition.
+
+In the future, we can base our classification on this table to find similar review groups. For example, if review_A is similar to review_B, and B is similar to C (each having a high cosine similarity value), then A, B, and C can be grouped into one class. By following this rule, we can further classify the data, thereby identifying the reasons behind similar reviews and the dimensions patients focus on when reviewing. This approach will help us address our research question.
+
+# ⚠️ Overall Comments
+
+The greatest challenge in this summative project is the large size of the dataset, which makes some methods like DBSCAN and LOF very time-consuming to run, as they require pairwise calculations for each data point. This serves as an excellent example of the important trade-off between accuracy and efficiency. In real life, unlike the small, processed datasets used in lectures, we often deal with very large, unprocessed datasets. To address this issue, in my summative, I used the approach of *randomly selecting a representative sample subset* for model building and analysis. This approach maintains data randomness while significantly reducing computation time. This method is quite common in practice.
+
+However, this method has its drawbacks, such as the potential introduction of bias. Despite randomly selecting a portion of the data, selection bias can still occur, for example, depending on the seed setting, which can lead to different results. Additionally, if some representative data are not included in the sample, our results may be skewed. Therefore, in real life, we need to find a balance within this trade-off.
+
+We could also consider other solutions, such as:
+
+1. Do a K-means clustering first before analysing the text data by selecting only a few clusters to analyse. This method can reduce the number of data points to be analysed and speed up the process.
+
+2. Use parallel processing by distributing the workload across multiple processors or machines can make handling large datasets more feasible.
+
+By considering these alternative approaches, we can better manage the trade-off between accuracy and efficiency in handling large datasets.
+
+
+# 🎊 Finally
+
+>*Q: How do you plan on rewarding yourself (as you should!) after completing this exam?*
+
+Good question 🤔. I’m currently lying in bed finishing this assignment, and I will probably sleep the whole afternoon 😴. Then, next next week, I'm going to visit Disneyland 🎉🎉🎉! Starting next month, I will begin my internship work 💪.
+
+
+# 🛠️ References and Self-Learning Resources:
+
+-   For random forest, I referred to the [RandomForest documentation](https://cran.r-project.org/web/packages/randomForest/randomForest.pdf) to understand the concept and the use of parameters.
+
+-   I used `mtry =  sqrt(ncol(train_data) - 1)` when creating the random forest, this information is referred to the above documentation at pp. 18.
+
+-   I explored on `Cosine Similarity` from this blog: [Exploring the Real-world Applications of Cosine Similarity](https://www.datastax.com/guides/real-world-applications-of-cosine-similarity) which was mentioned in the lecture slides.
+
+-   I used the package `quanteda.textstats` by referring to the [R documentation](https://cran.r-project.org/web/packages/quanteda.textstats/quanteda.textstats.pdf).
+
+
+
+# 💻 AI Usage:
+
+I used **ChatGPT3.5** for the following tasks:
+
+-   I was not sure what `cost_complexity` stands for in the decision tree speficication, I then asked ChatGPT3.5 about *what does cost_complexity mean in decision tree*. It gave me an introduction about the concept, I then adopted the explanation to my model and explained in my own words.
+
+-   I asked ChatGPT3.5 about *the concept of Kappa value*, it then gave me the meaning of Kappa value and how it is used in many applications. I then used the information to evaluate my model and explained it in my own words.
+
+-   I asked ChatGPT3.5 about *the ways to process large dataset*, it introduced me to the concept of `parallel processing`. I then adopted the concept to my report and mentioned it the `Overall Comments` section.
