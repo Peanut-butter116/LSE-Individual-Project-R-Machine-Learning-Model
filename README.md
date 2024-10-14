@@ -1,6 +1,9 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-24ddc0f5d75046c5622901739e7c5dd533143b0c8e959d652212380cedb1ea36.svg)](https://classroom.github.com/a/jyrbdRQh)
 # 📝 Summer Summative ('Exam')
 
+This README.md file shows the instructions for the individual project. Please see the **Main Work.qmd** file for the detailed project content and how I answered the following questions.
+
+
 💡 **NOTE:** This time as well, you are not _asked_ to write code as part of the assignment. If you choose to do so, please ensure your code confirms, reinforces, or complements your answers. Adding code just for the sake of it will not help you get a higher grade. 
 
 
