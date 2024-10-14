@@ -2,36 +2,6 @@
 
 >_This README.md file shows the instructions for the individual project. Please see the **Main Work.qmd** file for the detailed project content and how I answered the following questions._
 
-# 🗄️ Get the data
-
-## What data will you be using?
-
-You will be using two distinct datasets for this summative.
-
-### Parts 1 and 2
-
-Your dataset, for these parts, the CDC Diabetes Health Indicators dataset, comes from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators) where it was made public. This dataset was created for the purpose of better understanding relationship between lifestyle and diabetes in the US. It consists of demographics features, lab test results, and answers to survey questions for each patient. The target variable (`Diabetes_012`) in this dataset encodes whether a patient has diabetes (value 1), is pre-diabetic (value 2), or is healthy (value 0).
-
-**Preparation**
-
-1. Download the data by clicking on the button below.
-
-<a href="cdc_diabetes.csv" style="margin-left:2em;" download>
-    <button class="button-61">Download CDC Diabetes Health Indicators dataset (csv file)</button>
-</a>
-
-### Part 3
-
-In this part, you're again using a dataset made publicly available on the [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/462/drug+review+dataset+drugs+com). This time, it's a dataset that provides patient reviews on specific drugs along with related conditions and a 10 star patient rating reflecting overall patient satisfaction. The data was obtained by crawling online pharmaceutical review sites. Based on an initial associated publication (see UCI website), the data was split in into training (75%) and test (25%) sets and stored into two distinct .tsv (tab-separated-values) files, respectively (both compressed in a zip archive).
-
-**Preparation**
-
-Click on the button below to download the dataset:
-
-<a href="drug_review_dataset.zip" style="margin-left:2em;" download>
-    <button class="button-61">Download Drug reviews dataset (zip file)</button>
-</a>
-
 
 # 📋 Your Tasks
 
