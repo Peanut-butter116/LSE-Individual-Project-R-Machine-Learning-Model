@@ -8,6 +8,9 @@ editor:
     preview: true
 ---
 # 📖 Introduction
+
+#### Please refer to this GitHub repository for the full report and corresponding codings: [DS202W Summer Summative](https://github.com/Peanut-butter116/LSE-Individual-Project-R-Machine-Learning-Model)
+
 This is the exam assignment of the DS202W course. The whole report follows the instructions in the README file. However, here are some notes about this report that I would like to mention before you start reading it:
 
 -   The whole report takes 10 minutes to run in total.
